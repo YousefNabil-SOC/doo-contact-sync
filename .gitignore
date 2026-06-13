@@ -48,3 +48,11 @@ mcp/dist/
 
 # ---- Local reference docs (may contain setup secrets) ----
 DOO-Connector-Setup-Reference.pdf
+
+# ---- Internal / strategy docs (kept local, never published) ----
+/CLAUDE.md
+/DOO-KNOWLEDGE-BASE.md
+/SETUP-STATUS.md
+/ACTION-AI-DISCOVERY.md
+/doo-contact-sync/CLAUDE.md
+/doo-contact-sync/AGENTS.md
