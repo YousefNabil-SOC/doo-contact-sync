@@ -13,7 +13,40 @@ Connectors).
   logging with secret redaction, and a health endpoint.
 
 Stack: Next.js (App Router) + TypeScript (strict) + Prisma + Supabase Postgres,
-deployable to Vercel.
+deployed on Vercel.
+
+This repository also includes an **MCP server** (Phase 2) that exposes the same
+actions as tools an AI agent can call. The HubSpot half of the integration runs
+live against a real HubSpot portal; the honest scope note below says exactly
+what is real and what is a local stand-in.
+
+---
+
+## What is real vs. a local stand-in
+
+Being precise about scope, because production credibility depends on it.
+
+**Real, end to end:**
+- A registered HubSpot OAuth app and the real authorization-code flow with
+  automatic access-token refresh.
+- Real CRM reads and writes through the HubSpot API, and real HubSpot v3
+  webhook-signature verification on the raw request body.
+- OAuth has been exercised live against a real HubSpot portal - the callback
+  stored real access and refresh tokens in Postgres.
+- Postgres (Supabase) is the real source of truth: `Connection`, `Contact`,
+  `SyncLedger`, and `WebhookEvent`, applied with real migrations.
+- The MCP server is real and runs over stdio with four working tools.
+
+**Local stand-in (by necessity):**
+- The "DOO side" of the sync is represented by this project's own Postgres
+  contact store, because DOO's internal contact API is not publicly available.
+  The sync engine talks to a small `ContactRepo` port, so replacing the local
+  store with DOO's real API is a single adapter - the idempotency, loop guard,
+  and conflict resolution are unchanged.
+
+Nothing here is faked to look like it works: the HubSpot half is genuinely live;
+only DOO's unavailable internal endpoint is represented by a real local database
+behind a clean interface.
 
 ---
 
@@ -64,35 +97,42 @@ Valid events are deduplicated by HubSpot `eventId`, then upserted locally.
 
 ```mermaid
 flowchart LR
-  subgraph HubSpot
-    HS[HubSpot CRM]
-    AUTH[OAuth authorize/token]
+  AG["AI agent (Claude Code / Cursor / Codex)"]
+
+  subgraph MCP["MCP server (stdio, Phase 2)"]
+    TOOLS["create_contact<br/>find_contact<br/>sync_now<br/>get_sync_status"]
   end
 
-  subgraph Connector["DOO Contact Sync (Next.js)"]
-    OS[/api/oauth/start/]
-    OC[/api/oauth/callback/]
-    WH[/api/webhooks/hubspot/]
-    CT[/api/contacts/]
-    SY[/api/sync/]
-    HE[/api/health/]
-    TM[Token Manager\nauto-refresh + encrypt]
-    EN[Sync Engine\nhash echo-guard + LWW]
-    CL[HubSpot Client\n429 retry/backoff]
+  subgraph Connector["DOO Contact Sync (Next.js on Vercel)"]
+    OAUTH["OAuth routes: start + callback"]
+    WH["Webhook receiver: v3 signature verify"]
+    API["Contacts + Sync API"]
+    SVC["Shared service layer"]
+    EN["Sync engine: hash echo-guard + LWW"]
+    TM["Token manager: auto-refresh + AES-GCM"]
+    CL["HubSpot client: 429 retry + backoff"]
   end
 
-  DB[(Postgres\nConnection / Contact\nSyncLedger / WebhookEvent)]
+  subgraph HubSpot["HubSpot"]
+    HS["HubSpot CRM"]
+    HAUTH["OAuth authorize / token"]
+  end
 
-  OS -->|redirect| AUTH
-  AUTH -->|code| OC
-  OC --> TM --> DB
-  WH -->|verify v3 signature| EN
-  CT --> EN
-  SY --> EN
-  EN --> CL --> HS
-  EN --> DB
+  DB[("Postgres: Connection, Contact,<br/>SyncLedger, WebhookEvent")]
+
+  AG -->|tool call| TOOLS
+  TOOLS --> SVC
+  API --> SVC
+  SVC --> EN
+  OAUTH -->|authorize| HAUTH
+  HAUTH -->|code exchange| TM
+  TM --> DB
+  HS -->|signed event| WH
+  WH --> EN
+  EN --> CL
+  CL --> HS
   CL --> TM
-  HE --> DB
+  EN --> DB
 ```
 
 Outbound: a local change -> Sync Engine -> HubSpot Client -> HubSpot. Inbound: a
@@ -118,6 +158,25 @@ See `docs/openapi.yaml` for the full contract.
 
 ---
 
+## MCP server (Phase 2)
+
+`mcp/` is a stdio MCP server that exposes the connector's actions as four tools
+an AI agent (Claude Code, Cursor, Codex) can call directly:
+
+| Tool | Purpose |
+| ---- | ------- |
+| `create_contact` | create a local contact and push it outbound to HubSpot |
+| `find_contact` | look a contact up by email (local store, then HubSpot) |
+| `sync_now` | reconcile both sides on demand |
+| `get_sync_status` | connection state + recent sync-ledger summary |
+
+It reuses the **same shared service layer** as the HTTP API, so there is no
+duplicated business logic. Every tool validates its input with zod and always
+returns a structured result (it never throws), so an agent never hangs. See
+`mcp/README.md` to register and run it.
+
+---
+
 ## Project layout
 
 ```
@@ -130,6 +189,7 @@ lib/hubspot/           oauth, tokens, client (retry/backoff), signature, contact
 lib/sync/              ports, engine (outbound/inbound), reconcile, hash, mapping, adapters
 lib/validation.ts      zod input schemas
 prisma/schema.prisma   Connection, Contact, SyncLedger, WebhookEvent
+mcp/                   stdio MCP server (4 tools) + its own README
 test/                  vitest unit + round-trip tests
 docs/openapi.yaml      API contract
 ```
@@ -180,6 +240,28 @@ been applied to the configured database.
 
 For serverless/transaction-pooler runtime (port 6543), append
 `?pgbouncer=true&connection_limit=1` to `DATABASE_URL`.
+
+---
+
+## Deploy (Vercel)
+
+The app deploys to Vercel with no special configuration - the framework is
+auto-detected and the build runs `prisma generate && next build` (the Prisma
+client is generated on Vercel's Linux builders, so the correct query engine is
+bundled - no `binaryTargets` needed). The Node.js runtime is pinned to 22.x via
+`engines` in `package.json`; `vercel.json` pins the framework and build command.
+
+1. Set the environment variables listed in `DEPLOY-ENV-VARS.txt` in the Vercel
+   project (Production scope), taking the values from your local `.env.local`.
+2. For the live domain, set `APP_BASE_URL` to the Vercel URL and
+   `HUBSPOT_REDIRECT_URI` to that URL + `/api/oauth/callback` (not localhost).
+3. In the HubSpot app, add the production redirect URL
+   (`<live-url>/api/oauth/callback`) and the webhook target URL
+   (`<live-url>/api/webhooks/hubspot`), and subscribe to contact creation and
+   property-change events.
+
+`GET <live-url>/api/health` returns `200` with `database: true` and
+`config: true` once the variables are set.
 
 ---
 

@@ -4,6 +4,9 @@
   "private": true,
   "description": "DOO Contact Sync - production HubSpot two-way contact sync connector (OAuth 2.0, signature-verified webhooks, Postgres sync ledger).",
   "type": "module",
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",

@@ -1,0 +1,56 @@
+DOO Contact Sync - production environment variables (Vercel)
+============================================================
+Set these in the Vercel project: Settings -> Environment Variables ->
+Environment "Production". Take each VALUE from your local .env.local. Only the
+NAMES are listed here on purpose - no secret values appear in this file or in
+the repository.
+
+Legend:
+  [SECRET]   = treat the value as a secret; never share, print, or commit it.
+  [LIVE-URL] = must use the deployed Vercel URL, not localhost.
+
+REQUIRED  (health reports config:true and database:true only when these are set)
+--------------------------------------------------------------------------------
+HUBSPOT_CLIENT_ID
+    HubSpot OAuth app client id (developer.hubspot.com -> your app -> Auth).
+
+HUBSPOT_CLIENT_SECRET            [SECRET]
+    HubSpot OAuth app client secret. Also the key used to verify inbound
+    webhook v3 signatures. From the same Auth page / your local .env.local.
+
+HUBSPOT_REDIRECT_URI             [LIVE-URL]
+    OAuth redirect target. In production set to:
+        <live-vercel-url>/api/oauth/callback
+    The same value must be added to the allowed redirect URLs in the HubSpot
+    app (developer.hubspot.com -> your app -> Auth).
+
+APP_BASE_URL                     [LIVE-URL]
+    Public base URL of this deployment. Set to the live Vercel URL exactly
+    (no trailing slash). Used to rebuild the canonical URI for webhook v3
+    signature verification.
+
+DATABASE_URL                     [SECRET]
+    Supabase Postgres POOLED connection string (used at runtime). Contains a
+    password, so treat the whole value as secret. For the transaction pooler
+    (port 6543), append ?pgbouncer=true&connection_limit=1.
+
+OPTIONAL  (recommended)
+-----------------------
+DIRECT_URL                       [SECRET]
+    Supabase direct / session-pooler connection (port 5432). Used by Prisma
+    migrations. Not required for runtime queries, but set it for completeness.
+
+TOKEN_ENCRYPTION_KEY             [SECRET]
+    base64-encoded 32-byte key. If set, OAuth tokens are encrypted at rest with
+    AES-256-GCM. Generate once with:
+        node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+
+HUBSPOT_SCOPES
+    Space-separated OAuth scopes. Optional - defaults to:
+        oauth crm.objects.contacts.read crm.objects.contacts.write
+
+Notes
+-----
+- The Node.js runtime is pinned to 22.x via "engines" in package.json.
+- Do NOT set NODE_ENV; Vercel sets it to "production" automatically.
+- After saving these for the Production environment, redeploy so they apply.

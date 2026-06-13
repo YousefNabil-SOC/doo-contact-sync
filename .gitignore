@@ -42,3 +42,9 @@ Thumbs.db
 
 # ---- MCP build output ----
 mcp/dist/
+
+# ---- Vercel ----
+.vercel
+
+# ---- Local reference docs (may contain setup secrets) ----
+DOO-Connector-Setup-Reference.pdf

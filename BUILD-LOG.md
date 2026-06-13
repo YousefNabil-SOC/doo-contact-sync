@@ -137,3 +137,25 @@ the intent behind it, and key decisions. Tool: Claude Code (Opus 4.8).
 - Intent: make the MCP server runnable and reviewable.
 - Changed: `mcp/README.md` (tools, run, client registration), `BUILD-LOG.md`,
   `CLAUDE.md` (Phase 2 status + files).
+
+---
+
+## 2026-06-13 - Phase 3: go live (public repo + Vercel)
+
+### Commit 13 - chore(deploy): prep deploy artifacts for production
+- Intent: make the connector and MCP server publicly reviewable and ready to
+  deploy to Vercel without changing any business logic.
+- Changed: `README.md` (extended the architecture diagram to include the MCP
+  tools and the calling AI agent; added an honest "real vs. local stand-in"
+  scope note; added MCP-server and Vercel-deploy sections), `vercel.json`
+  (framework + build command), `package.json` (pinned Node 22.x via `engines`),
+  `.gitignore` (ignore `.vercel` and a local reference PDF that may hold setup
+  secrets), `DEPLOY-ENV-VARS.txt` (names-only production env checklist),
+  `BUILD-LOG.md`.
+- Decisions: deploy via the Vercel CLI building remotely on Linux, so
+  `prisma generate` produces the correct query engine - no `binaryTargets`
+  needed. Secrets are entered by hand in the Vercel dashboard, never committed.
+  The first deploy is expected to build green with the HubSpot and database
+  features inert until the environment variables are set. Verified the build is
+  green and that only `/` and `/_not-found` prerender statically while all seven
+  API routes are dynamic (so `next build` runs no DB query and needs no secret).
