@@ -88,3 +88,52 @@ the intent behind it, and key decisions. Tool: Claude Code (Opus 4.8).
 - `docs: add Mermaid architecture diagram` - GitHub-rendered diagram of the
   outbound/inbound flow through the engine, client, token manager, and DB.
 - `docs: log follow-up commits` - this entry (keeps one log entry per commit).
+
+---
+
+## 2026-06-13 - Phase 2: MCP server wrapping the connector
+
+### Commit 8 - docs: persist DOO + Builders League knowledge base
+- Intent: never lose the company/league context across sessions.
+- Changed: `DOO-KNOWLEDGE-BASE.md` (DOO product, league tracks, Phase 1/2,
+  hiring funnel, build-log rule, Yousef's 98/100 screening), `CLAUDE.md`
+  (pointer to it), `.gitignore` (.vscode, mcp/dist).
+- Decision: captured from build.doo.ooo + www.doo.ooo and the application
+  screenshots so a fresh session is fully grounded.
+
+### Commit 9 - refactor: shared service layer + gateway search (reuse, no dup)
+- Intent: expose the connector's logic through one shared layer that both the
+  HTTP routes and the MCP server call - no duplicated business logic.
+- Changed: `lib/services/connector-service.ts` (createContact, findContact,
+  syncNow, getSyncStatus - dependency-injected), extended `ContactGateway`
+  with `searchByEmail` (`lib/sync/ports.ts`, `lib/hubspot/contacts.ts`,
+  `lib/sync/adapters.ts`, `test/fakes.ts`), refactored
+  `app/api/contacts/route.ts` to call the service, and taught `lib/logger.ts`
+  to route all output to stderr when `LOG_TO_STDERR=1`.
+- Decision: DI (repo + optional SyncPorts) keeps the service testable with
+  in-memory fakes and identical in production.
+
+### Commit 10 - feat(mcp): stdio MCP server with four tools
+- Intent: expose create_contact, find_contact, sync_now, get_sync_status as MCP
+  tools (Claude Code / Cursor / Codex).
+- Changed: `mcp/server.ts`, `mcp/tools.ts`, `mcp/bootstrap-env.ts`,
+  `tsup.config.ts`, `package.json` (sdk, dotenv, tsup, tsx + mcp scripts).
+- Decisions: `@modelcontextprotocol/sdk` v1 with zod-v3 raw-shape input
+  schemas (confirmed against the installed .d.ts, not guessed). Every handler
+  validates input and ALWAYS returns a structured CallToolResult (never throws)
+  so an agent never hangs. stdout is the protocol channel, so logs are forced
+  to stderr and dotenv's banner is silenced (quiet:true) - verified 0 stdout
+  pollution and all 4 tools enumerate over a real initialize/tools-list
+  handshake.
+
+### Commit 11 - test(mcp): validation + happy-path tool tests
+- Intent: prove each tool validates input and works end to end without a live
+  portal.
+- Changed: `test/mcp-tools.test.ts` (11 tests; total suite now 37).
+- Decision: call the DI handlers directly with the Phase 1 fakes; assert
+  structured errors on bad input and correct results on happy paths.
+
+### Commit 12 - docs: MCP README + status
+- Intent: make the MCP server runnable and reviewable.
+- Changed: `mcp/README.md` (tools, run, client registration), `BUILD-LOG.md`,
+  `CLAUDE.md` (Phase 2 status + files).
