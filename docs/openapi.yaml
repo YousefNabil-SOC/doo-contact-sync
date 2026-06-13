@@ -1,0 +1,259 @@
+openapi: 3.1.0
+info:
+  title: DOO Contact Sync API
+  version: 1.0.0
+  description: >
+    Production HubSpot two-way contact sync connector. OAuth 2.0 with automatic
+    token refresh, signature-verified webhooks (HubSpot v3), and a Postgres
+    sync ledger with idempotency and loop prevention.
+servers:
+  - url: http://localhost:3000
+    description: Local development
+paths:
+  /api/health:
+    get:
+      summary: Health check
+      description: Returns service, config, database, and token status.
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+        "503":
+          description: Degraded (config or database check failed)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+  /api/oauth/start:
+    get:
+      summary: Begin OAuth
+      description: Sets a CSRF state cookie and redirects to HubSpot's authorize URL.
+      responses:
+        "307":
+          description: Redirect to HubSpot authorize URL
+  /api/oauth/callback:
+    get:
+      summary: OAuth callback
+      description: Verifies state, exchanges the code for tokens, stores them.
+      parameters:
+        - in: query
+          name: code
+          schema: { type: string }
+        - in: query
+          name: state
+          schema: { type: string }
+        - in: query
+          name: error
+          schema: { type: string }
+      responses:
+        "200":
+          description: Connected
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  connected: { type: boolean }
+                  portalId: { type: string }
+        "401": { description: Invalid or missing state }
+        "400": { description: OAuth provider error }
+        "502": { description: Token exchange failed }
+  /api/webhooks/hubspot:
+    post:
+      summary: Inbound HubSpot webhook
+      description: >
+        Verifies the X-HubSpot-Signature-v3 header against the raw body before
+        trusting it. Deduplicates by eventId and upserts contacts locally.
+      parameters:
+        - in: header
+          name: X-HubSpot-Signature-v3
+          required: true
+          schema: { type: string }
+        - in: header
+          name: X-HubSpot-Request-Timestamp
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: "#/components/schemas/WebhookEvent"
+      responses:
+        "200":
+          description: Processed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  received: { type: integer }
+                  processed:
+                    type: array
+                    items: { type: object }
+        "400": { description: Invalid JSON or shape }
+        "401": { description: Invalid signature }
+  /api/contacts:
+    get:
+      summary: List local contacts
+      responses:
+        "200":
+          description: Contacts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count: { type: integer }
+                  contacts:
+                    type: array
+                    items: { $ref: "#/components/schemas/Contact" }
+    post:
+      summary: Create a local contact and push it to HubSpot
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ContactCreate" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  contact: { $ref: "#/components/schemas/Contact" }
+                  sync: { $ref: "#/components/schemas/SyncOutcome" }
+        "400": { description: Validation failed }
+  /api/contacts/{id}:
+    get:
+      summary: Fetch one local contact
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: Contact }
+        "404": { description: Not found }
+    patch:
+      summary: Update a local contact and push to HubSpot
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ContactUpdate" }
+      responses:
+        "200": { description: Updated }
+        "400": { description: Validation failed }
+        "404": { description: Not found }
+  /api/sync:
+    post:
+      summary: Reconcile both sides on demand
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                maxPages: { type: integer, minimum: 1, maximum: 50 }
+                pageSize: { type: integer, minimum: 1, maximum: 100 }
+      responses:
+        "200":
+          description: Reconciled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string }
+                  summary: { $ref: "#/components/schemas/ReconcileSummary" }
+        "409": { description: No HubSpot connection }
+        "502": { description: Reconcile failed }
+components:
+  schemas:
+    Health:
+      type: object
+      properties:
+        status: { type: string, enum: [ok, degraded] }
+        checks:
+          type: object
+          properties:
+            config: { type: boolean }
+            database: { type: boolean }
+            token: { type: boolean }
+        connection:
+          type: object
+          nullable: true
+          properties:
+            connected: { type: boolean }
+            portalId: { type: string, nullable: true }
+            expiresAt: { type: string, nullable: true }
+            expired: { type: boolean }
+        time: { type: string }
+    Contact:
+      type: object
+      properties:
+        id: { type: string }
+        email: { type: string, nullable: true }
+        firstName: { type: string, nullable: true }
+        lastName: { type: string, nullable: true }
+        phone: { type: string, nullable: true }
+        hubspotObjectId: { type: string, nullable: true }
+        version: { type: integer }
+        deleted: { type: boolean }
+        updatedAt: { type: string }
+    ContactCreate:
+      type: object
+      properties:
+        email: { type: string, format: email }
+        firstName: { type: string }
+        lastName: { type: string }
+        phone: { type: string }
+    ContactUpdate:
+      type: object
+      properties:
+        email: { type: string, format: email, nullable: true }
+        firstName: { type: string, nullable: true }
+        lastName: { type: string, nullable: true }
+        phone: { type: string, nullable: true }
+    SyncOutcome:
+      type: object
+      properties:
+        status: { type: string }
+        outcome: { type: string, enum: [CREATE, UPDATE, DELETE, SKIP] }
+        detail: { type: string }
+    ReconcileSummary:
+      type: object
+      properties:
+        outbound: { $ref: "#/components/schemas/OutcomeCounts" }
+        inbound: { $ref: "#/components/schemas/OutcomeCounts" }
+    OutcomeCounts:
+      type: object
+      properties:
+        CREATE: { type: integer }
+        UPDATE: { type: integer }
+        DELETE: { type: integer }
+        SKIP: { type: integer }
+    WebhookEvent:
+      type: object
+      properties:
+        eventId: { type: integer }
+        subscriptionType: { type: string }
+        objectId: { type: integer }
+        portalId: { type: integer }
+        occurredAt: { type: integer }
+        propertyName: { type: string }
+        propertyValue: { type: string }
