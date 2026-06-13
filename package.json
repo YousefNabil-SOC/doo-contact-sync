@@ -1,0 +1,36 @@
+{
+  "name": "doo-contact-sync",
+  "version": "1.0.0",
+  "private": true,
+  "description": "DOO Contact Sync - production HubSpot two-way contact sync connector (OAuth 2.0, signature-verified webhooks, Postgres sync ledger).",
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "prisma generate && next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "dotenv -e .env.local -- prisma migrate dev",
+    "prisma:deploy": "dotenv -e .env.local -- prisma migrate deploy",
+    "prisma:studio": "dotenv -e .env.local -- prisma studio",
+    "db:check": "dotenv -e .env.local -- node scripts/db-check.mjs"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.3.1",
+    "next": "^15.1.6",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.7",
+    "@types/react": "^19.0.7",
+    "dotenv-cli": "^8.0.0",
+    "prisma": "^6.3.1",
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.8"
+  }
+}

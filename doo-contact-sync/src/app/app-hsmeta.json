@@ -1,0 +1,35 @@
+{
+  "uid": "doo_contact_sync_app",
+  "type": "app",
+  "config": {
+    "description": "DOO Contact Sync - two-way HubSpot contact sync connector (OAuth 2.0).",
+    "name": "DOO Contact Sync",
+    "distribution": "marketplace",
+    "auth": {
+      "type": "oauth",
+      "redirectUrls": [
+        "http://localhost:3000/api/oauth/callback"
+      ],
+      "requiredScopes": [
+        "oauth",
+        "crm.objects.contacts.read",
+        "crm.objects.contacts.write"
+      ],
+      "optionalScopes": [],
+      "conditionallyRequiredScopes": []
+    },
+    "permittedUrls": {
+      "fetch": [
+        "https://api.hubapi.com"
+      ],
+      "iframe": [],
+      "img": []
+    },
+    "support": {
+      "supportEmail": "support@example.com",
+      "documentationUrl": "https://example.com/docs",
+      "supportUrl": "https://example.com/support",
+      "supportPhone": "+18005555555"
+    }
+  }
+}
