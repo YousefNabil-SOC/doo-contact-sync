@@ -1,0 +1,104 @@
+// DOO Contact Sync - data model
+// Postgres (Supabase). Pooled DATABASE_URL for runtime, DIRECT_URL for migrations.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+/// One row per connected HubSpot portal. Tokens are stored at rest (encrypted
+/// with AES-256-GCM when TOKEN_ENCRYPTION_KEY is set) and are never logged.
+model Connection {
+  id           String   @id @default(cuid())
+  portalId     BigInt   @unique
+  accessToken  String
+  refreshToken String
+  expiresAt    DateTime
+  scopes       String?
+  tokenType    String   @default("bearer")
+  encrypted    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("connections")
+}
+
+/// Local "DOO side" contact store. `lastSyncedHash` is the content hash of the
+/// field set at the moment of the last successful sync; it is the loop guard.
+model Contact {
+  id              String    @id @default(cuid())
+  email           String?
+  firstName       String?
+  lastName        String?
+  phone           String?
+  hubspotObjectId String?   @unique
+  portalId        BigInt?
+  version         Int       @default(1)
+  lastSyncedHash  String?
+  lastSyncedAt    DateTime?
+  deleted         Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([email])
+  @@index([portalId])
+  @@map("contacts")
+}
+
+enum SyncDirection {
+  OUTBOUND
+  INBOUND
+}
+
+enum SyncAction {
+  CREATE
+  UPDATE
+  DELETE
+  SKIP
+}
+
+enum SyncStatus {
+  SUCCESS
+  FAILED
+  SKIPPED
+}
+
+/// Append-only audit + idempotency record for every sync attempt.
+model SyncLedger {
+  id          String        @id @default(cuid())
+  direction   SyncDirection
+  objectType  String        @default("contact")
+  hubspotId   String?
+  localId     String?
+  action      SyncAction
+  status      SyncStatus
+  contentHash String?
+  detail      String?
+  createdAt   DateTime      @default(now())
+
+  @@index([hubspotId])
+  @@index([localId])
+  @@index([contentHash])
+  @@map("sync_ledger")
+}
+
+/// Inbound webhook events, deduplicated by HubSpot eventId. Records whether the
+/// signature validated, for audit.
+model WebhookEvent {
+  id               String    @id @default(cuid())
+  eventId          BigInt    @unique
+  dedupKey         String    @unique
+  subscriptionType String?
+  objectId         BigInt?
+  portalId         BigInt?
+  signatureValid   Boolean   @default(false)
+  processedAt      DateTime?
+  createdAt        DateTime  @default(now())
+
+  @@map("webhook_events")
+}
