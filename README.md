@@ -60,6 +60,46 @@ Valid events are deduplicated by HubSpot `eventId`, then upserted locally.
 
 ---
 
+## Architecture
+
+```mermaid
+flowchart LR
+  subgraph HubSpot
+    HS[HubSpot CRM]
+    AUTH[OAuth authorize/token]
+  end
+
+  subgraph Connector["DOO Contact Sync (Next.js)"]
+    OS[/api/oauth/start/]
+    OC[/api/oauth/callback/]
+    WH[/api/webhooks/hubspot/]
+    CT[/api/contacts/]
+    SY[/api/sync/]
+    HE[/api/health/]
+    TM[Token Manager\nauto-refresh + encrypt]
+    EN[Sync Engine\nhash echo-guard + LWW]
+    CL[HubSpot Client\n429 retry/backoff]
+  end
+
+  DB[(Postgres\nConnection / Contact\nSyncLedger / WebhookEvent)]
+
+  OS -->|redirect| AUTH
+  AUTH -->|code| OC
+  OC --> TM --> DB
+  WH -->|verify v3 signature| EN
+  CT --> EN
+  SY --> EN
+  EN --> CL --> HS
+  EN --> DB
+  CL --> TM
+  HE --> DB
+```
+
+Outbound: a local change -> Sync Engine -> HubSpot Client -> HubSpot. Inbound: a
+signed webhook -> verify -> Sync Engine fetches the authoritative record ->
+upsert local. The `lastSyncedHash` echo guard stops the two directions from
+looping; the ledger records every attempt.
+
 ## Endpoints
 
 | Method | Path | Purpose |
