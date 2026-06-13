@@ -38,3 +38,7 @@ Thumbs.db
 
 # ---- Tooling artifacts ----
 .omc/
+.vscode/
+
+# ---- MCP build output ----
+mcp/dist/
