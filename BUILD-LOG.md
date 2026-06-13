@@ -82,3 +82,9 @@ the intent behind it, and key decisions. Tool: Claude Code (Opus 4.8).
   (Phase 1 status).
 - Decisions: documented the OAuth/webhook/sync design, env vars, the Supabase
   `DIRECT_URL` migration note, and the full route contract.
+
+### Follow-ups
+- `chore: ignore .omc tooling artifacts` - keep the tree clean.
+- `docs: add Mermaid architecture diagram` - GitHub-rendered diagram of the
+  outbound/inbound flow through the engine, client, token manager, and DB.
+- `docs: log follow-up commits` - this entry (keeps one log entry per commit).
