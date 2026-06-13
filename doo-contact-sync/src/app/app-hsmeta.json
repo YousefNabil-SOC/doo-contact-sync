@@ -8,6 +8,7 @@
     "auth": {
       "type": "oauth",
       "redirectUrls": [
+        "https://doo-contact-sync.vercel.app/api/oauth/callback",
         "http://localhost:3000/api/oauth/callback"
       ],
       "requiredScopes": [

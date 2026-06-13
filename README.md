@@ -15,6 +15,9 @@ Connectors).
 Stack: Next.js (App Router) + TypeScript (strict) + Prisma + Supabase Postgres,
 deployed on Vercel.
 
+**Live:** https://doo-contact-sync.vercel.app -
+health: https://doo-contact-sync.vercel.app/api/health
+
 This repository also includes an **MCP server** (Phase 2) that exposes the same
 actions as tools an AI agent can call. The HubSpot half of the integration runs
 live against a real HubSpot portal; the honest scope note below says exactly

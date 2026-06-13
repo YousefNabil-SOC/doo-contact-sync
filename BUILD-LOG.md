@@ -159,3 +159,20 @@ the intent behind it, and key decisions. Tool: Claude Code (Opus 4.8).
   features inert until the environment variables are set. Verified the build is
   green and that only `/` and `/_not-found` prerender statically while all seven
   API routes are dynamic (so `next build` runs no DB query and needs no secret).
+
+### Commit 14 - feat(hubspot): production redirect URL + webhook subscriptions
+- Intent: wire the live HubSpot app to the deployed connector so both OAuth and
+  inbound webhooks work in production - kept as config-as-code, not dashboard
+  clicks.
+- Changed: `doo-contact-sync/src/app/app-hsmeta.json` (added the production
+  redirect URL alongside localhost); new
+  `doo-contact-sync/src/app/webhooks/webhook-hsmeta.json` (targetUrl = the live
+  `/api/webhooks/hubspot`; subscriptions: contact `object.creation` +
+  `contact.propertyChange` on email/firstname/lastname/phone). Live URL added to
+  `README.md` and `docs/openapi.yaml`.
+- Decisions: deployed with `hs project upload` (build #2, auto-deployed to portal
+  148692684). The webhook target is the stable Vercel alias so the v3 signature's
+  canonical URI matches `APP_BASE_URL`. Subscriptions cover the exact fields the
+  sync engine maps, so inbound creations and edits both fire.
+- Verified: live `GET /api/health` returns 200 with `config:true, database:true`;
+  the deployment is publicly reachable (no Vercel deployment protection).

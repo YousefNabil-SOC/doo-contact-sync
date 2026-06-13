@@ -7,6 +7,8 @@ info:
     token refresh, signature-verified webhooks (HubSpot v3), and a Postgres
     sync ledger with idempotency and loop prevention.
 servers:
+  - url: https://doo-contact-sync.vercel.app
+    description: Production (Vercel)
   - url: http://localhost:3000
     description: Local development
 paths:
