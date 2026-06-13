@@ -2,7 +2,9 @@ import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { json, ok, badRequest } from "@/lib/http/responses";
 import { ContactCreateSchema } from "@/lib/validation";
-import { pushContactOutbound } from "@/lib/sync/runtime";
+import { prismaContactRepo } from "@/lib/sync/adapters";
+import { activeSyncPorts } from "@/lib/sync/runtime";
+import { createContact } from "@/lib/services/connector-service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,15 +33,14 @@ export async function POST(req: NextRequest): Promise<Response> {
     return badRequest("validation_failed", parsed.error.flatten());
   }
 
-  const contact = await prisma.contact.create({
-    data: {
+  const result = await createContact(
+    { repo: prismaContactRepo, ports: await activeSyncPorts() },
+    {
       email: parsed.data.email ?? null,
       firstName: parsed.data.firstName ?? null,
       lastName: parsed.data.lastName ?? null,
       phone: parsed.data.phone ?? null,
     },
-  });
-
-  const sync = await pushContactOutbound(contact.id);
-  return json({ contact, sync }, 201);
+  );
+  return json(result, 201);
 }

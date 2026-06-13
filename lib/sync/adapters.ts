@@ -6,6 +6,7 @@ import {
   deleteContact,
   getContact,
   listContacts,
+  searchContactByEmail,
   updateContact,
 } from "@/lib/hubspot/contacts";
 import type {
@@ -106,6 +107,7 @@ export function hubspotGateway(client: HubSpotClient): ContactGateway {
       const page = await listContacts(client, after, limit);
       return { results: page.results, after: page.paging?.next?.after };
     },
+    searchByEmail: (email) => searchContactByEmail(client, email),
   };
 }
 

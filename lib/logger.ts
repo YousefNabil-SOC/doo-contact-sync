@@ -43,7 +43,10 @@ function emit(level: Level, message: string, context?: unknown): void {
       : {}),
   };
   const line = JSON.stringify(entry);
-  if (level === "error" || level === "warn") {
+  // When LOG_TO_STDERR is set (e.g. the MCP stdio server, where stdout is the
+  // protocol channel), route every level to stderr to avoid corrupting it.
+  const forceStderr = process.env.LOG_TO_STDERR === "1";
+  if (forceStderr || level === "error" || level === "warn") {
     process.stderr.write(line + "\n");
   } else {
     process.stdout.write(line + "\n");

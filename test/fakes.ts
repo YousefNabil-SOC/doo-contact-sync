@@ -65,6 +65,13 @@ export class FakeGateway implements ContactGateway {
     return { results: [...this.store.values()] };
   }
 
+  async searchByEmail(email: string): Promise<HubSpotContact | null> {
+    for (const c of this.store.values()) {
+      if (c.properties?.email === email) return c;
+    }
+    return null;
+  }
+
   /** Seed a remote contact directly (simulating a HubSpot-origin record). */
   seed(id: string, properties: Record<string, string>): HubSpotContact {
     const c: HubSpotContact = { id, properties, archived: false };

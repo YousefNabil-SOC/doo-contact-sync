@@ -63,3 +63,23 @@ export async function listContacts(
   if (after) qs.set("after", after);
   return client.request<ContactPage>("GET", `${BASE}?${qs.toString()}`);
 }
+
+/** Find a single contact by exact email via the CRM search API. */
+export async function searchContactByEmail(
+  client: HubSpotClient,
+  email: string,
+): Promise<HubSpotContact | null> {
+  const body = {
+    filterGroups: [
+      { filters: [{ propertyName: "email", operator: "EQ", value: email }] },
+    ],
+    properties: HUBSPOT_CONTACT_PROPERTIES,
+    limit: 1,
+  };
+  const res = await client.request<{ results: HubSpotContact[] }>(
+    "POST",
+    `${BASE}/search`,
+    body,
+  );
+  return res.results[0] ?? null;
+}

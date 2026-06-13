@@ -62,6 +62,7 @@ export interface ContactGateway {
     after?: string,
     limit?: number,
   ): Promise<{ results: HubSpotContact[]; after?: string }>;
+  searchByEmail(email: string): Promise<HubSpotContact | null>;
 }
 
 export interface SyncPorts {
