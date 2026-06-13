@@ -35,3 +35,6 @@ dist/
 build/
 .DS_Store
 Thumbs.db
+
+# ---- Tooling artifacts ----
+.omc/
